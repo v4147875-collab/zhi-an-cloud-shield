@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>新一代智能化家庭安防系统 · 日志中心版</title>
+  <style>
+    /* ========== UI 基础 ========== */
+    :root {
+      --cyan: #00e0ff;
+      --cyan-light: #5cebff;
+      --cyan-dark: #0088cc;
+      --blue-accent: #2a6fdb;
+      --bg-deep: #0a1428;
+      --glass-bg: rgba(5, 22, 40, 0.65);
+      --glass-blur: blur(18px) saturate(1.8);
+      --border-glow: 0 0 18px rgba(0, 224, 255, 0.6), inset 0 0 10px rgba(0, 224, 255, 0.15);
+      --cyan-glow: 0 0 20px rgba(0, 224, 255, 0.9);
+      --cyan-strong: rgba(0, 224, 255, 1);
+      --text-bright: #ecf9ff;
+      --transition-smooth: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-bright);
+    }
+
+    @keyframes alarmFlash {
+      0%, 100% { box-shadow: inset 0 0 80px rgba(255,0,0,0.6); border: 2px solid rgba(255,0,0,0.5); }
+      50% { box-shadow: inset 0 0 180px rgba(255,0,0,1); border: 4px solid rgba(255,0,0,1); }
+    }
+    body.alarm-active {
+      animation: alarmFlash 0.5s infinite;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-image:
+        linear-gradient(rgba(0, 224, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 224, 255, 0.04) 1px, transparent 1px);
+      background-size: 45px 45px;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* 侧边栏 */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      width: 18vw;
+      height: 100vh;
+      padding: 2.5vh 1.2vw;
+      display: flex;
+      flex-direction: column;
+      gap: 2vh;
+      z-index: 5;
+    }
+    .sidebar-left { left: 0; }
+    .sidebar-right { right: 0; }
+
+    .func-card {
+      flex: 1;
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border-radius: 2.8vh;
+      padding: 2.2vh 1.8vh;
+      display: flex;
+      flex-direction: column;
+      gap: 1.8vh;
+      border: 1.5px solid rgba(0, 224, 255, 0.45);
+      box-shadow: var(--border-glow), 0 8px 25px rgba(0, 0, 0, 0.5);
+      transition: var(--transition-smooth);
+      cursor: default; /* 不再可点击切换模拟数据 */
+      position: relative;
+      overflow: hidden;
+    }
+    .func-card::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(circle at 30% 20%, rgba(0, 224, 255, 0.1), transparent 70%);
+      pointer-events: none;
+    }
+    .func-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--cyan);
+      box-shadow: 0 0 35px rgba(0, 224, 255, 0.7), inset 0 0 20px rgba(0, 224, 255, 0.25);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1.2vh;
+      border-bottom: 1.8px solid rgba(0, 224, 255, 0.6);
+      position: relative;
+    }
+    .card-title {
+      font-size: 2.2vh;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #ffffff, var(--cyan-light));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 0 15px var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-dot {
+      width: 1.4vh;
+      height: 1.4vh;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #fff, var(--cyan));
+      box-shadow: 0 0 20px var(--cyan), 0 0 35px var(--cyan);
+      animation: pulseGlow 2s infinite alternate;
+    }
+    @keyframes pulseGlow {
+      0% { opacity: 0.8; transform: scale(1); box-shadow: 0 0 12px var(--cyan); }
+      100% { opacity: 1; transform: scale(1.25); box-shadow: 0 0 30px var(--cyan-light); }
+    }
+
+    .card-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.7vh;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      color: #d9f0ff;
+      text-shadow: 0 0 10px rgba(0, 224, 255, 0.6);
+      gap: 1.4vh;
+      text-align: center;
+    }
+    .chart-box { width: 85%; height: 60%; position: relative; filter: drop-shadow(0 0 12px rgba(0, 224, 255, 0.4)); }
+    .chart-box canvas { width: 100%; height: 100%; }
+
+    .main-content {
+      margin: 0 18vw;
+      width: calc(100vw - 36vw);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0;
+      gap: 2vh;
+      position: relative;
+    }
+
+    /* 标题栏 */
+    .project-title-wrap {
+      width: calc(100vw - 36vw);
+      left: 18vw;
+      right: 18vw;
+      padding: 2.5vh 0 2vh 0;
+      position: fixed;
+      top: 0;
+      z-index: 25;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: transparent;
+      overflow: visible;
+    }
+    .project-title-wrap::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse 120% 200% at 50% 0%, rgba(0, 160, 255, 0.25) 0%, rgba(0, 80, 160, 0.15) 40%, rgba(5, 20, 40, 0.95) 80%, #0a1428 100%);
+      backdrop-filter: blur(4px);
+      border-bottom: 2px solid rgba(0, 224, 255, 0.7);
+      box-shadow: 0 0 60px rgba(0, 224, 255, 0.3), inset 0 -10px 30px rgba(0,0,0,0.5);
+      z-index: -2;
+    }
+    .project-title-wrap::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent 0%, rgba(0, 224, 255, 0.15) 15%, rgba(0, 224, 255, 0.4) 30%, rgba(0, 224, 255, 0.6) 50%, rgba(0, 224, 255, 0.4) 70%, rgba(0, 224, 255, 0.15) 85%, transparent 100%) 0 0 / 100% 3px no-repeat,
+        repeating-linear-gradient(45deg, rgba(0, 224, 255, 0.2) 0px, rgba(0, 224, 255, 0.2) 4px, transparent 4px, transparent 12px) 0 0 / 60px 40px no-repeat,
+        repeating-linear-gradient(-45deg, rgba(0, 224, 255, 0.15) 0px, rgba(0, 224, 255, 0.15) 3px, transparent 3px, transparent 10px) 100% 0 / 70px 50px no-repeat;
+      filter: drop-shadow(0 0 8px rgba(0, 224, 255, 0.5));
+      z-index: -1;
+      pointer-events: none;
+    }
+    .title-divider {
+      position: absolute;
+      bottom: 0;
+      left: 5%;
+      width: 90%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan), var(--cyan-light), transparent);
+      box-shadow: 0 0 12px var(--cyan-glow);
+      opacity: 0.9;
+      z-index: 3;
+    }
+    .project-title {
+      text-align: center;
+      font-size: 5.5vh;
+      font-weight: 900;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+      color: #ffffff;
+      text-shadow: 0 0 20px var(--cyan), 0 0 40px var(--cyan), 0 0 80px var(--cyan-dark), 0 4px 10px rgba(0, 0, 0, 0.5);
+      -webkit-text-stroke: 1px rgba(0, 224, 255, 0.3);
+      white-space: nowrap;
+      filter: drop-shadow(0 0 15px rgba(0, 224, 255, 0.6));
+      line-height: 1.4;
+      position: relative;
+      z-index: 10;
+      pointer-events: auto;
+      background: transparent;
+      animation: titleFadeIn 1.2s ease-out, titlePulse 3s infinite alternate 1.2s;
+    }
+    @keyframes titleFadeIn {
+      0% { opacity: 0; transform: translateY(-10px); filter: blur(2px); }
+      30% { opacity: 1; text-shadow: 0 0 30px var(--cyan), 0 0 60px var(--cyan-light); }
+      100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+    }
+    @keyframes titlePulse {
+      0% { text-shadow: 0 0 25px var(--cyan), 0 0 50px var(--cyan-dark), 0 0 80px rgba(0, 224, 255, 0.5); }
+      100% { text-shadow: 0 0 40px var(--cyan-light), 0 0 70px var(--cyan), 0 0 120px var(--blue-accent); }
+    }
+
+    .title-left-decoration, .title-right-decoration { position: absolute; top: 50%; transform: translateY(-50%); width: 8%; height: 35%; pointer-events: none; z-index: 0; opacity: 0.7; }
+    .title-left-decoration { left: 2%; background: linear-gradient(135deg, transparent 0%, rgba(0, 224, 255, 0.1) 20%, transparent 50%), repeating-linear-gradient(45deg, rgba(0, 224, 255, 0.2) 0px, rgba(0, 224, 255, 0.2) 2px, transparent 2px, transparent 8px); clip-path: polygon(0% 0%, 80% 0%, 100% 50%, 80% 100%, 0% 100%); border-left: 2px solid rgba(0, 224, 255, 0.5); }
+    .title-right-decoration { right: 2%; background: linear-gradient(-135deg, transparent 0%, rgba(0, 224, 255, 0.1) 20%, transparent 50%), repeating-linear-gradient(-45deg, rgba(0, 224, 255, 0.2) 0px, rgba(0, 224, 255, 0.2) 2px, transparent 2px, transparent 8px); clip-path: polygon(20% 0%, 100% 0%, 100% 100%, 20% 100%, 0% 50%); border-right: 2px solid rgba(0, 224, 255, 0.5); }
+    .binary-code-left, .binary-code-right { position: absolute; bottom: 8%; font-size: 10px; opacity: 0.3; }
+    .binary-code-left { left: 5%; } .binary-code-right { right: 5%; }
+    .tech-icon-corner { position: absolute; bottom: 5%; right: 3%; width: 35px; height: 35px; opacity: 0.7; }
+
+    .view-3d {
+      width: 100%; flex: 1; margin-top: 12vh; border-radius: 3vh; overflow: hidden;
+      background: rgba(5, 18, 30, 0.7); backdrop-filter: blur(5px);
+      border: 2px solid rgba(0, 224, 255, 0.65);
+      box-shadow: 0 0 50px rgba(0, 224, 255, 0.35), inset 0 0 35px rgba(0, 224, 255, 0.15);
+      position: relative; z-index: 2;
+    }
+    .view-status-tip {
+      position: absolute; bottom: 12px; right: 16px; background: rgba(5, 22, 40, 0.8);
+      backdrop-filter: blur(8px); padding: 6px 16px; border-radius: 30px;
+      border: 1px solid var(--cyan); box-shadow: 0 0 15px var(--cyan-glow);
+      color: var(--cyan); font-size: 1.4vh; font-weight: 600; letter-spacing: 1px;
+      z-index: 20; pointer-events: none;
+    }
+
+    /* 底部导航 */
+    .nav-container {
+      width: 46%; background: rgba(8, 25, 45, 0.7); backdrop-filter: blur(22px);
+      border-radius: 4vh; padding: 1.5vh 2vh; display: flex; gap: 1.5vh;
+      border: 1.5px solid rgba(0, 224, 255, 0.65);
+      box-shadow: 0 0 40px rgba(0, 224, 255, 0.45), inset 0 0 18px rgba(0,224,255,0.15);
+      position: fixed; bottom: 7vh; left: 27vw; z-index: 35;
+    }
+    .nav-item {
+      flex: 1; text-align: center; padding: 1.4vh 0; font-size: 2vh; font-weight: 700;
+      letter-spacing: 0.15em; border-radius: 3vh; background: rgba(0, 45, 75, 0.45);
+      color: #c0e4ff; cursor: pointer; transition: var(--transition-smooth);
+      text-shadow: 0 0 12px var(--cyan); border: 1px solid rgba(0, 224, 255, 0.35);
+      box-shadow: inset 0 0 12px rgba(0, 224, 255, 0.1); backdrop-filter: blur(5px);
+    }
+    .nav-item:hover {
+      background: rgba(0, 224, 255, 0.25); color: #ffffff;
+      box-shadow: 0 0 35px var(--cyan), inset 0 0 15px rgba(255,255,255,0.3);
+      border-color: var(--cyan); transform: scale(1.05);
+    }
+    .nav-item.active {
+      background: linear-gradient(145deg, var(--blue-accent), var(--cyan)); color: #ffffff;
+      box-shadow: 0 0 45px var(--cyan-strong), inset 0 0 18px rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.6); text-shadow: 0 0 20px #fff; font-weight: 800;
+    }
+
+    .broadcast-area {
+      width: 64%; background: rgba(5, 22, 38, 0.7); backdrop-filter: blur(18px);
+      border-radius: 3vh; padding: 1.6vh 3vh; overflow: hidden; white-space: nowrap;
+      border: 1.5px solid rgba(0, 224, 255, 0.55);
+      box-shadow: 0 0 35px rgba(0, 224, 255, 0.25), inset 0 0 20px rgba(0,224,255,0.15);
+      position: fixed; bottom: 2vh; left: 18vw; z-index: 35;
+    }
+    .broadcast-area::before {
+      content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(0,224,255,0.2), transparent);
+      animation: scanLine 7s linear infinite; pointer-events: none;
+    }
+    @keyframes scanLine { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .broadcast-text {
+      display: inline-block; color: #dcf3ff; font-size: 1.8vh; font-weight: 600;
+      letter-spacing: 0.1em; text-shadow: 0 0 18px var(--cyan);
+      animation: scroll 14s linear infinite;
+    }
+    @keyframes scroll { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+
+    .page-container { position: relative; width: 100vw; height: 100vh; }
+    .page { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity 0.4s; overflow: hidden; }
+    .page.active { opacity: 1; visibility: visible; z-index: 10; }
+    .monitor-main { margin: 0 18vw; width: calc(100vw - 36vw); height: 100vh; display: flex; flex-direction: column; padding: 13vh 1vw 2vh 1vw; gap: 2vh; }
+    .monitor-screen-placeholder {
+      flex: 1; background: rgba(5, 20, 35, 0.6); backdrop-filter: blur(12px); border-radius: 3vh;
+      border: 2px solid rgba(0, 224, 255, 0.55); box-shadow: 0 0 45px rgba(0, 224, 255, 0.3), inset 0 0 35px rgba(0,224,255,0.15);
+      display: flex; align-items: center; justify-content: center; color: #a0dfff;
+      font-size: 3.5vh; font-weight: 600; letter-spacing: 0.3em; text-shadow: 0 0 30px var(--cyan);
+    }
+    .monitor-screen-placeholder::after { content: "监控画面预留区 · 无视频流"; opacity: 0.85; }
+    .device-list { list-style: none; width: 100%; padding: 0 0.3vw; }
+    .device-item { display: flex; align-items: center; padding: 1.2vh 1vw; margin: 0.6vh 0; border-radius: 1.5vh; background: rgba(0, 55, 85, 0.4); backdrop-filter: blur(6px); border: 1px solid rgba(0, 224, 255, 0.35); font-size: 1.6vh; }
+    .status-badge { width: 1.2vh; height: 1.2vh; border-radius: 50%; margin-right: 1.2vh; background: #0f6; box-shadow: 0 0 20px #0f6; }
+    .alert-item { background: rgba(255, 60, 60, 0.25); border-left: 5px solid #ff4d4d; }
+    .value-large { font-size: 5.5vh; font-weight: 800; color: var(--cyan); text-shadow: 0 0 35px var(--cyan); }
+    .progress-bar { width: 100%; height: 1vh; background: rgba(0, 45, 65, 0.7); border-radius: 2vh; margin: 1.2vh 0; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--blue-accent)); box-shadow: 0 0 18px var(--cyan); border-radius: 2vh; }
+
+    /* 日志样式 */
+    .log-layout { display: flex; width: 100%; height: 100%; padding: 12vh 1.5vw 12vh 1.5vw; gap: 2vw; }
+    .log-sidebar-new { width: 24vw; display: flex; flex-direction: column; gap: 2vh; }
+    .log-glass-card { background: var(--glass-bg); backdrop-filter: var(--glass-blur); border-radius: 2.5vh; padding: 2.2vh 1.8vh; border: 1.5px solid rgba(0, 224, 255, 0.4); box-shadow: var(--border-glow); }
+    .log-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 1.2vh; border-bottom: 1.8px solid rgba(0, 224, 255, 0.6); margin-bottom: 1.8vh; }
+    .log-header h3 { font-size: 2.2vh; font-weight: 700; letter-spacing: 0.1em; color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
+    .online-dot { width: 1.4vh; height: 1.4vh; border-radius: 50%; background: #0f6; box-shadow: 0 0 20px #0f6; animation: pulse 1.8s infinite; }
+    .overview-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5vh; }
+    .stat-item { background: rgba(0, 20, 35, 0.5); border-radius: 1.8vh; padding: 1.2vh; text-align: center; border: 1px solid rgba(0, 224, 255, 0.2); }
+    .stat-value { font-size: 3.2vh; font-weight: 800; color: var(--cyan); text-shadow: 0 0 15px var(--cyan); }
+    .stat-label { font-size: 1.4vh; opacity: 0.9; }
+    .filter-tabs { display: flex; gap: 0.8vw; margin-bottom: 2vh; }
+    .tab-btn { flex: 1; text-align: center; padding: 0.8vh 0; border-radius: 2vh; background: rgba(0, 30, 50, 0.5); border: 1px solid rgba(0, 224, 255, 0.3); color: #a0c0e0; cursor: pointer; font-size: 1.6vh; font-weight: 600; transition: var(--transition-smooth); }
+    .tab-btn.active { background: var(--cyan); color: #0a1428; border-color: #fff; box-shadow: 0 0 20px var(--cyan); }
+    .tab-btn.alert-tab.active { background: #ff4444; box-shadow: 0 0 20px #ff4444; }
+    .time-filters { display: flex; flex-wrap: wrap; gap: 0.8vh; }
+    .time-btn { padding: 0.6vh 1.2vw; border-radius: 2vh; background: rgba(0, 30, 50, 0.4); border: 1px solid rgba(0, 224, 255, 0.3); color: #c0d8f0; font-size: 1.4vh; cursor: pointer; }
+    .time-btn.active { background: var(--cyan); color: #0a1428; box-shadow: 0 0 10px var(--cyan); }
+    .hidden-test-gear { position: absolute; bottom: 20px; right: 20px; z-index: 100; }
+    .gear-btn { width: 45px; height: 45px; border-radius: 50%; background: rgba(5, 22, 40, 0.7); backdrop-filter: blur(10px); border: 1.5px solid var(--cyan); box-shadow: 0 0 15px var(--cyan-glow); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition-smooth); opacity: 0.5; }
+    .gear-btn:hover { opacity: 1; transform: scale(1.1); background: var(--cyan); }
+    .gear-btn span { font-size: 28px; color: var(--cyan); }
+    .gear-btn:hover span { color: #0a1428; }
+    .log-content-area { flex: 1; display: flex; flex-direction: column; background: var(--glass-bg); backdrop-filter: var(--glass-blur); border-radius: 2.5vh; padding: 2vh; border: 1.5px solid rgba(0, 224, 255, 0.4); box-shadow: var(--border-glow); position: relative; }
+    .log-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1.2vh; padding-right: 0.5vw; }
+    .log-item { display: grid; grid-template-columns: 7vh 1.8fr 2.5fr 1.5fr 0.8fr; align-items: center; padding: 1.2vh 1.5vw; border-radius: 1.8vh; background: rgba(0, 20, 40, 0.4); border: 1px solid rgba(0, 224, 255, 0.15); transition: var(--transition-smooth); backdrop-filter: blur(5px); }
+    .log-item:hover { border-color: var(--cyan); box-shadow: 0 0 15px rgba(0, 224, 255, 0.3); transform: translateY(-2px); }
+    .log-item.alert-log { background: rgba(255, 60, 60, 0.12); border-left: 5px solid #ff3d3d; }
+    .log-time { font-size: 1.6vh; font-weight: 500; color: #b0d0f0; }
+    .log-icon { font-size: 2.2vh; }
+    .log-type { font-weight: 600; font-size: 1.7vh; }
+    .log-detail { font-size: 1.6vh; opacity: 0.9; }
+    .log-location { font-size: 1.6vh; }
+    .log-level { padding: 0.5vh 1vh; border-radius: 2vh; text-align: center; font-weight: 700; font-size: 1.5vh; background: rgba(0,0,0,0.3); }
+    .level-high { background: #ff3d3d; color: #fff; box-shadow: 0 0 10px #ff3d3d; }
+    .level-mid { background: #ffa500; color: #000; }
+    .level-low { background: #00aaff; color: #fff; }
+
+    .test-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--glass-bg); backdrop-filter: blur(25px); border: 2px solid var(--cyan); border-radius: 3vh; padding: 3vh 4vw; z-index: 1000; box-shadow: 0 0 60px var(--cyan); }
+    .test-modal h3 { color: var(--cyan); margin-bottom: 2vh; }
+    .test-action { background: transparent; border: 1px solid var(--cyan); color: var(--cyan); padding: 1.2vh 2vw; margin: 0.5vh 0; border-radius: 2vh; cursor: pointer; font-size: 1.8vh; transition: var(--transition-smooth); }
+    .test-action:hover { background: var(--cyan); color: #0a1428; }
+  </style>
+</head>
+<body>
+
+<div id="intro-overlay" style="
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: white;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.8s ease;
+  pointer-events: none;
+">
+  <div id="intro-main-text" style="
+    font-size: 46px;
+    font-weight: 500;
+    color: #1a1a1a;
+    font-family: 'Noto Serif SC', '华文楷体', 'KaiTi', 'Microsoft YaHei', serif;
+    text-align: center;
+    margin-bottom: 10px;
+  ">新一代智能化家庭安防系统</div>
+  <div id="intro-sub-text" style="
+    font-size: 22px;
+    font-weight: 400;
+    color: #444;
+    font-family: 'Noto Serif SC', 'KaiTi', sans-serif;
+    text-align: center;
+    margin-bottom: 30px;
+  ">100% 次世代智能安防</div>
+  <div style="width: 260px; height: 4px; background: #ddd; border-radius: 2px; overflow: hidden;">
+    <div id="intro-progress-fill" style="width: 0%; height: 100%; background: #1a1a1a; transition: width 0.05s linear;"></div>
+  </div>
+  <div id="intro-progress-text" style="
+    margin-top: 10px;
+    font-size: 16px;
+    color: #555;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  ">0%</div>
+</div>
+
+<div class="page-container">
+
+  <div class="page active" id="page-home">
+    <div class="sidebar sidebar-left">
+      <div class="func-card" id="card1">
+        <div class="card-header"><div class="card-title">电路状态</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="chart1"></canvas></div><div id="txt1">负载：--% | 状态：等待数据</div></div>
+      </div>
+      <div class="func-card" id="card2">
+        <div class="card-header"><div class="card-title">消防监测</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="chart2"></canvas></div><div id="txt2">烟感：-- | 无火焰</div></div>
+      </div>
+      <div class="func-card" id="card3">
+        <div class="card-header"><div class="card-title">人员检测</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="chart3"></canvas></div><div id="txt3">人数：--人 | 等待检测</div></div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="view-3d" id="view3d-home"></div>
+    </div>
+
+    <div class="sidebar sidebar-right">
+      <div class="func-card" id="card4">
+        <div class="card-header"><div class="card-title">环境温湿度</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="chart4"></canvas></div><div id="txt4">--℃ | 湿度 --%RH</div></div>
+      </div>
+      <div class="func-card" id="card5">
+        <div class="card-header"><div class="card-title">用电统计</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="chart5"></canvas></div><div id="txt5">今日：--kWh | 等待数据</div></div>
+      </div>
+      <div class="func-card" id="card6">
+        <div class="card-header"><div class="card-title">报警状态</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="chart6"></canvas></div><div id="txt6">报警：--次 | 系统正常</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-monitor">
+    <div class="sidebar sidebar-left">
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📹 监控设备列表</div><div class="card-dot"></div></div>
+        <div class="card-content" style="align-items: stretch; padding: 0 0.5vw;">
+          <ul class="device-list">
+            <li class="device-item"><span class="status-badge"></span> 主入口摄像头 · 在线</li>
+            <li class="device-item"><span class="status-badge"></span> 走廊摄像头 · 在线</li>
+            <li class="device-item"><span class="status-badge" style="background:#fa0; box-shadow:0 0 10px #fa0;"></span> 后门摄像头 · 信号弱</li>
+            <li class="device-item"><span class="status-badge"></span> 大厅全景 · 在线</li>
+            <li class="device-item"><span class="status-badge" style="background:#888;"></span> 仓库摄像头 · 离线</li>
+          </ul>
+        </div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📊 状态面板</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div style="display: flex; width: 100%; justify-content: space-around;">
+            <div>在线率 <span style="color:#0f6;">92%</span></div>
+            <div>录像状态 <span style="color:#0cf;">● 录制中</span></div>
+          </div>
+          <div style="margin-top: 1vh;">存储剩余 2.4TB / 8TB</div>
+        </div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">⚠️ 告警信息</div><div class="card-dot"></div></div>
+        <div class="card-content" style="align-items: stretch;">
+          <div class="device-item alert-item">[运动检测] 走廊异常移动 13:22</div>
+          <div class="device-item alert-item">[遮挡报警] 后门摄像头 12:05</div>
+          <div class="device-item" style="opacity:0.7;">无其他告警</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="monitor-main">
+      <div class="monitor-screen-placeholder"></div>
+    </div>
+
+    <div class="sidebar sidebar-right">
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📈 实时码流</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="monitorChart1"></canvas></div><div>平均码率 4.2 Mbps</div></div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📉 存储趋势</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="monitorChart2"></canvas></div><div>预计剩余 12 天</div></div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📊 事件统计</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="monitorChart3"></canvas></div><div>今日事件 23 次</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-power">
+    <div class="sidebar sidebar-left">
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">⚡ 实时功率</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div class="value-large">-- kW</div>
+          <div>当前总功率</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📊 分项用电</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div class="chart-box"><canvas id="powerChart1"></canvas></div>
+          <div>空调 --% | 照明 --%</div>
+        </div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">🔋 电压电流</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div>电压: --V</div>
+          <div>电流: --A</div>
+          <div>功率因数: --</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="view-3d" id="view3d-power"></div>
+    </div>
+
+    <div class="sidebar sidebar-right">
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📈 今日用电</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div class="value-large">-- kWh</div>
+          <div>较昨日 --%</div>
+        </div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📉 本周趋势</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div class="chart-box"><canvas id="powerChart2"></canvas></div>
+          <div>周累计 -- kWh</div>
+        </div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">💰 电费预估</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div class="value-large">¥--</div>
+          <div>本月累计</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-temp">
+    <div class="sidebar sidebar-left">
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">🌡️ 温度</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div class="value-large">--°C</div>
+          <div>等待数据</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">💧 湿度</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div class="value-large">--%</div>
+          <div>等待数据</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">🌬️ 空气质量</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div id="air-pm25">PM2.5: -- µg/m³</div>
+          <div id="air-co2">CO₂: -- ppm</div>
+          <div id="air-tvoc">TVOC: -- mg/m³</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="view-3d" id="view3d-temp"></div>
+    </div>
+
+    <div class="sidebar sidebar-right">
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📈 24h温度</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="tempChart1"></canvas></div></div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">📉 24h湿度</div><div class="card-dot"></div></div>
+        <div class="card-content"><div class="chart-box"><canvas id="tempChart2"></canvas></div></div>
+      </div>
+      <div class="func-card">
+        <div class="card-header"><div class="card-title">🏠 各区域</div><div class="card-dot"></div></div>
+        <div class="card-content">
+          <div>客厅: --°C / --%</div>
+          <div>卧室: --°C / --%</div>
+          <div>厨房: --°C / --%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-log">
+    <div class="log-layout">
+      <div class="log-sidebar-new">
+        <div class="log-glass-card">
+          <div class="log-header"><h3>📊 系统概览</h3><div class="online-dot"></div></div>
+          <div class="overview-stats">
+            <div class="stat-item"><div class="stat-value" id="alertCount">0</div><div class="stat-label">今日告警</div></div>
+            <div class="stat-item"><div class="stat-value" id="onlineRate">100%</div><div class="stat-label">在线率</div></div>
+            <div class="stat-item"><div class="stat-value" id="uptime">--</div><div class="stat-label">运行时间</div></div>
+            <div class="stat-item"><div class="stat-value" id="eventTotal">0</div><div class="stat-label">今日事件</div></div>
+          </div>
+        </div>
+
+        <div class="log-glass-card">
+          <div class="log-header"><h3>🔍 日志过滤</h3></div>
+          <div class="filter-tabs">
+            <div class="tab-btn active" data-filter="all">全部</div>
+            <div class="tab-btn alert-tab" data-filter="alert">告警</div>
+            <div class="tab-btn" data-filter="running">运行</div>
+            <div class="tab-btn" data-filter="operation">操作</div>
+          </div>
+          <div class="time-filters">
+            <div class="time-btn active" data-time="1h">近1小时</div>
+            <div class="time-btn" data-time="24h">近24小时</div>
+            <div class="time-btn" data-time="7d">近7天</div>
+            <div class="time-btn" data-time="all">全部</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="log-content-area">
+        <div class="log-list" id="logListContainer"></div>
+        <div class="hidden-test-gear">
+          <div class="gear-btn" id="testPanelBtn" title="测试控制面板">
+            <span>⚙️</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="project-title-wrap">
+    <div class="title-left-decoration"></div><div class="title-right-decoration"></div>
+    <div class="binary-code-left">01001011 00101101 11010010</div><div class="binary-code-right">10110001 01011100 01101011</div>
+    <div class="tech-icon-corner"></div>
+    <div class="project-title">新一代智能化家庭安防系统</div>
+    <div class="title-divider"></div>
+  </div>
+</div>
+
+<div class="nav-container">
+  <div class="nav-item active" data-page="home">首页</div>
+  <div class="nav-item" data-page="monitor">监控</div>
+  <div class="nav-item" data-page="power">电表</div>
+  <div class="nav-item" data-page="temp">温湿度</div>
+  <div class="nav-item" data-page="log">日志</div>
+</div>
+<div class="broadcast-area"><div class="broadcast-text">【系统实时播报】设备在线 · 电压稳定 · 环境温湿度正常 · 无报警事件 · 智能安防系统运行中</div></div>
+
+<div class="test-modal" id="testModal">
+  <h3>🛠️ 测试控制面板</h3>
+  <div style="display:flex; flex-direction:column;">
+    <button class="test-action" data-action="intrude">🚨 模拟人员入侵</button>
+    <button class="test-action" data-action="smoke">🔥 模拟烟雾报警</button>
+    <button class="test-action" data-action="clear">🧹 清除日志</button>
+    <button class="test-action" data-action="export">📤 导出日志(Excel)</button>
+    <button class="test-action" data-action="testAlarm" style="margin-top:1.5vh; border-color:#ff4444; color:#ff4444;">🔊 测试报警（仅声音）</button>
+  </div>
+  <button id="closeModalBtn" style="margin-top:2vh; background:transparent; border:1px solid var(--cyan); color:var(--cyan); padding:1vh 2vw; border-radius:2vh; cursor:pointer;">关闭</button>
+</div>
+
+<script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.158.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/" } }
+</script>
+
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+  const sceneControlsMap = new Map();
+  window.allButtons = window.allButtons || [];
+
+  // 创建AI机器人模型
+  function createCyberRobot() {
+    const robotGroup = new THREE.Group();
+    robotGroup.name = 'AI_Robot';
+
+    const glassMaterial = new THREE.MeshPhongMaterial({
+      color: 0x88ccff,
+      emissive: new THREE.Color(0x004466),
+      emissiveIntensity: 0.5,
+      transparent: true,
+      opacity: 0.7,
+      roughness: 0.3,
+      metalness: 0.1
+    });
+
+    const darkGlassMaterial = new THREE.MeshPhongMaterial({
+      color: 0x557799,
+      emissive: new THREE.Color(0x002233),
+      emissiveIntensity: 0.4,
+      transparent: true,
+      opacity: 0.8,
+      roughness: 0.4
+    });
+
+    const lightMaterial = new THREE.MeshPhongMaterial({
+      color: 0x00e0ff,
+      emissive: new THREE.Color(0x0088aa),
+      emissiveIntensity: 1.0,
+      transparent: true,
+      opacity: 0.9
+    });
+
+    // 身体
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 0.8, 8), glassMaterial);
+    body.position.y = 0.45;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    body.name = 'body';
+    robotGroup.add(body);
+
+    // 胸口环
+    const chestRing = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 8, 20), lightMaterial);
+    chestRing.rotation.x = Math.PI / 2;
+    chestRing.rotation.z = 0.3;
+    chestRing.position.set(0, 0.55, 0.35);
+    chestRing.name = 'chestRing';
+    robotGroup.add(chestRing);
+
+    // 胸口灯
+    const chestLight = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshPhongMaterial({
+      color: 0x00e0ff,
+      emissive: new THREE.Color(0x00aacc),
+      emissiveIntensity: 1.5
+    }));
+    chestLight.position.set(0, 0.55, 0.43);
+    chestLight.name = 'chestLight';
+    robotGroup.add(chestLight);
+
+    // 头部组
+    const headGroup = new THREE.Group();
+    headGroup.position.y = 0.95;
+    headGroup.name = 'head';
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), glassMaterial);
+    head.scale.set(1.0, 0.9, 0.8);
+    head.castShadow = true;
+    head.receiveShadow = true;
+    head.name = 'headMesh';
+    headGroup.add(head);
+
+    const visorWireframe = new THREE.LineSegments(new THREE.EdgesGeometry(head.geometry), new THREE.LineBasicMaterial({ color: 0x00e0ff }));
+    visorWireframe.scale.copy(head.scale);
+    visorWireframe.name = 'visorWireframe';
+    headGroup.add(visorWireframe);
+
+    const faceLineMat = new THREE.LineBasicMaterial({ color: 0x88ddff });
+    const lineH = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.15,0,0.18), new THREE.Vector3(0.15,0,0.18)]), faceLineMat);
+    const lineV = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,-0.1,0.20), new THREE.Vector3(0,0.1,0.20)]), faceLineMat);
+    headGroup.add(lineH, lineV);
+
+    const eyeMat = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: new THREE.Color(0x00e0ff), emissiveIntensity: 1.2 });
+    const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6), eyeMat);
+    leftEye.position.set(-0.1, 0.05, 0.22);
+    leftEye.name = 'leftEye';
+    headGroup.add(leftEye);
+    const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6), eyeMat);
+    rightEye.position.set(0.1, 0.05, 0.22);
+    rightEye.name = 'rightEye';
+    headGroup.add(rightEye);
+
+    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 4), new THREE.MeshPhongMaterial({ color: 0xaaccff, emissive: new THREE.Color(0x226688), emissiveIntensity: 0.8 }));
+    antenna.position.set(0, 0.22, 0.05);
+    antenna.rotation.x = 0.2;
+    antenna.name = 'antenna';
+    headGroup.add(antenna);
+    const antennaBall = new THREE.Mesh(new THREE.SphereGeometry(0.04, 5), lightMaterial);
+    antennaBall.position.set(0, 0.3, 0.07);
+    antennaBall.name = 'antennaBall';
+    headGroup.add(antennaBall);
+
+    robotGroup.add(headGroup);
+
+    // 左臂
+    const leftArmGroup = new THREE.Group();
+    leftArmGroup.position.set(-0.45, 0.7, 0);
+    leftArmGroup.name = 'leftArm';
+    const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.4, 6), glassMaterial);
+    upperArm.position.y = -0.2;
+    upperArm.rotation.z = 0.3;
+    upperArm.rotation.x = 0.2;
+    upperArm.castShadow = true;
+    upperArm.receiveShadow = true;
+    upperArm.name = 'upperArm';
+    leftArmGroup.add(upperArm);
+    const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.35, 6), glassMaterial);
+    forearm.position.set(0.15, -0.45, 0.05);
+    forearm.rotation.z = -0.4;
+    forearm.rotation.x = 0.1;
+    forearm.castShadow = true;
+    forearm.receiveShadow = true;
+    forearm.name = 'forearm';
+    leftArmGroup.add(forearm);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 5), darkGlassMaterial);
+    hand.position.set(0.3, -0.6, 0.1);
+    hand.name = 'hand';
+    leftArmGroup.add(hand);
+    robotGroup.add(leftArmGroup);
+
+    // 右臂
+    const rightArmGroup = new THREE.Group();
+    rightArmGroup.position.set(0.45, 0.7, 0);
+    rightArmGroup.name = 'rightArm';
+    const rUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.4, 6), glassMaterial);
+    rUpperArm.position.y = -0.2;
+    rUpperArm.rotation.z = -0.3;
+    rUpperArm.rotation.x = -0.2;
+    rUpperArm.castShadow = true;
+    rUpperArm.receiveShadow = true;
+    rUpperArm.name = 'upperArm';
+    rightArmGroup.add(rUpperArm);
+    const rForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.35, 6), glassMaterial);
+    rForearm.position.set(-0.15, -0.45, -0.05);
+    rForearm.rotation.z = 0.4;
+    rForearm.rotation.x = -0.1;
+    rForearm.castShadow = true;
+    rForearm.receiveShadow = true;
+    rForearm.name = 'forearm';
+    rightArmGroup.add(rForearm);
+    const rHand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 5), darkGlassMaterial);
+    rHand.position.set(-0.3, -0.6, -0.1);
+    rHand.name = 'hand';
+    rightArmGroup.add(rHand);
+    robotGroup.add(rightArmGroup);
+
+    // 全息面板
+    const panelGroup = new THREE.Group();
+    panelGroup.position.set(0.4, 0.25, 0.3);
+    panelGroup.rotation.y = -0.3;
+    panelGroup.rotation.x = 0.1;
+    panelGroup.name = 'holoPanel';
+    const panelFrame = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.02), new THREE.MeshPhongMaterial({ color: 0x88aacc, transparent: true, opacity: 0.5, emissive: new THREE.Color(0x226688), emissiveIntensity: 0.6 }));
+    panelFrame.castShadow = true;
+    panelFrame.receiveShadow = true;
+    panelFrame.name = 'panelFrame';
+    panelGroup.add(panelFrame);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.22), new THREE.MeshPhongMaterial({ color: 0x00aaff, emissive: new THREE.Color(0x0088cc), emissiveIntensity: 1.0, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+    screen.position.z = 0.015;
+    screen.name = 'screen';
+    panelGroup.add(screen);
+    const screenLines = new THREE.LineSegments(new THREE.EdgesGeometry(screen.geometry), new THREE.LineBasicMaterial({ color: 0x00e0ff }));
+    screenLines.position.z = 0.016;
+    screenLines.name = 'screenLines';
+    panelGroup.add(screenLines);
+    robotGroup.add(panelGroup);
+
+    // 腿部
+    const legGeo = new THREE.CylinderGeometry(0.12, 0.14, 0.4, 6);
+    const leftLeg = new THREE.Mesh(legGeo, darkGlassMaterial);
+    leftLeg.position.set(-0.2, 0.1, 0);
+    leftLeg.castShadow = true;
+    leftLeg.receiveShadow = true;
+    leftLeg.name = 'leftLeg';
+    robotGroup.add(leftLeg);
+    const rightLeg = new THREE.Mesh(legGeo, darkGlassMaterial);
+    rightLeg.position.set(0.2, 0.1, 0);
+    rightLeg.castShadow = true;
+    rightLeg.receiveShadow = true;
+    rightLeg.name = 'rightLeg';
+    robotGroup.add(rightLeg);
+
+    // 底座
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.08, 8), darkGlassMaterial);
+    base.position.y = -0.04;
+    base.receiveShadow = true;
+    base.castShadow = true;
+    base.name = 'base';
+    robotGroup.add(base);
+
+    // 定位到房间内部的右上角
+    robotGroup.position.set(3.5, 0.2, 3.0);
+    robotGroup.rotation.y = -0.5;
+    return robotGroup;
+  }
+
+  function createIndoorScene(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a1428);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    container.appendChild(renderer.domElement);
+
+    const css2DRenderer = new CSS2DRenderer();
+    css2DRenderer.setSize(container.clientWidth, container.clientHeight);
+    css2DRenderer.domElement.style.position = 'absolute';
+    css2DRenderer.domElement.style.top = '0';
+    css2DRenderer.domElement.style.left = '0';
+    css2DRenderer.domElement.style.pointerEvents = 'none';
+    container.appendChild(css2DRenderer.domElement);
+
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+    camera.position.set(10, 5, 12);
+    camera.lookAt(0, 1.8, 0);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 1.5;
+    controls.enableZoom = true;
+    controls.target.set(0, 1.8, 0);
+    controls.maxPolarAngle = Math.PI / 2.1;
+    controls.minDistance = 5;
+    controls.maxDistance = 18;
+    controls.update();
+
+    const statusTip = document.createElement('div');
+    statusTip.className = 'view-status-tip';
+    statusTip.textContent = '自动旋转中';
+    container.style.position = 'relative';
+    container.appendChild(statusTip);
+
+    function flashHighlight() {
+      renderer.domElement.style.transition = 'box-shadow 0.15s';
+      renderer.domElement.style.boxShadow = '0 0 30px #00e0ff, inset 0 0 20px #00e0ff';
+      setTimeout(() => renderer.domElement.style.boxShadow = '', 200);
+    }
+    renderer.domElement.style.cursor = 'pointer';
+    renderer.domElement.addEventListener('click', () => {
+      controls.autoRotate = !controls.autoRotate;
+      statusTip.textContent = controls.autoRotate ? '自动旋转中' : '手动视角';
+      flashHighlight();
+    });
+
+    sceneControlsMap.set(containerId, { controls, statusTip });
+
+    // 光照
+    const ambientLight = new THREE.AmbientLight(0x404c66, 0.5); scene.add(ambientLight);
+    scene.add(new THREE.HemisphereLight(0x9bb8da, 0x2a3a4a, 0.9));
+    const dirLight = new THREE.DirectionalLight(0xfff5e6, 1.4); dirLight.position.set(6, 14, 7); dirLight.castShadow = true; dirLight.receiveShadow = true; dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024; scene.add(dirLight);
+    scene.add(new THREE.PointLight(0xccb89a, 0.6, 20, -3, 4.5, 5));
+    scene.add(new THREE.PointLight(0xaac0dd, 0.5, 20, 4, 3.2, -6));
+    scene.add(new THREE.PointLight(0x6a8faa, 0.35, 20, -2, 3, -8));
+
+    const buildingGroup = new THREE.Group(); const skinGroup = new THREE.Group(); const monitorGroup = new THREE.Group(); const furnitureGroup = new THREE.Group();
+    scene.add(buildingGroup); scene.add(skinGroup); scene.add(monitorGroup); scene.add(furnitureGroup);
+
+    function addBlueOutline(mesh, color = 0x3a9eff) { const edges = new THREE.EdgesGeometry(mesh.geometry); mesh.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color }))); }
+
+    const roomW = 8.5, roomD = 7.5, roomH = 4.0, wallThick = 0.12;
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xc8d8e8, roughness: 0.35, metalness: 0.05, transparent: true, opacity: 0.35, emissive: new THREE.Color(0x142433), emissiveIntensity: 0.12, side: THREE.DoubleSide });
+
+    // 地面网格
+    const gridCanvas = document.createElement('canvas');
+    gridCanvas.width = 512; gridCanvas.height = 512;
+    const ctx = gridCanvas.getContext('2d');
+    ctx.fillStyle = '#d6e2ef'; ctx.fillRect(0, 0, 512, 512);
+    ctx.strokeStyle = '#3a7bd5'; ctx.lineWidth = 3.5;
+    const step = 64;
+    for (let i = 0; i <= 8; i++) {
+      const pos = i * step;
+      ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, 512);
+      ctx.strokeStyle = '#3f8aff'; ctx.lineWidth = i % 2 === 0 ? 2.8 : 1.8; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, pos); ctx.lineTo(512, pos); ctx.stroke();
+    }
+    const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+    grad.addColorStop(0, 'rgba(90, 160, 255, 0.12)'); grad.addColorStop(1, 'rgba(200, 220, 240, 0)');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 512, 512);
+
+    const groundTexture = new THREE.CanvasTexture(gridCanvas);
+    groundTexture.wrapS = THREE.RepeatWrapping; groundTexture.wrapT = THREE.RepeatWrapping;
+    groundTexture.repeat.set(roomW, roomD);
+    const groundMat = new THREE.MeshStandardMaterial({ map: groundTexture, roughness: 0.7, metalness: 0.05, emissive: new THREE.Color(0x88aadd), emissiveIntensity: 0.18, color: 0xeeeeee });
+    const ground = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.05, roomD), groundMat);
+    ground.position.set(0, -0.025, 0); ground.receiveShadow = true; ground.castShadow = false;
+    buildingGroup.add(ground);
+
+    const ceilingMat = new THREE.MeshStandardMaterial({ color: 0xdce4f0, roughness: 0.65, metalness: 0.05, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.08, roomD), ceilingMat);
+    ceiling.position.set(0, roomH - 0.04, 0); ceiling.receiveShadow = true; ceiling.castShadow = false;
+    buildingGroup.add(ceiling);
+
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(roomW, roomH, wallThick), wallMaterial.clone());
+    backWall.position.set(0, roomH/2, -roomD/2 + wallThick/2); backWall.castShadow = true; backWall.receiveShadow = true;
+    buildingGroup.add(backWall); addBlueOutline(backWall);
+
+    const frontWall = new THREE.Mesh(new THREE.BoxGeometry(roomW, roomH, wallThick), wallMaterial.clone());
+    frontWall.position.set(0, roomH/2, roomD/2 - wallThick/2); frontWall.castShadow = true; frontWall.receiveShadow = true;
+    buildingGroup.add(frontWall); addBlueOutline(frontWall);
+
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, roomH, roomD), wallMaterial.clone());
+    leftWall.position.set(-roomW/2 + wallThick/2, roomH/2, 0); leftWall.castShadow = true; leftWall.receiveShadow = true;
+    buildingGroup.add(leftWall); addBlueOutline(leftWall);
+
+    const rightWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, roomH, roomD), wallMaterial.clone());
+    rightWall.position.set(roomW/2 - wallThick/2, roomH/2, 0); rightWall.castShadow = true; rightWall.receiveShadow = true;
+    buildingGroup.add(rightWall); addBlueOutline(rightWall);
+
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x9c7e5e, roughness: 0.65, metalness: 0.1 });
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.5, wallThick + 0.02), doorMat);
+    door.position.set(2.0, 1.25, roomD/2 - wallThick/2); door.castShadow = true; door.receiveShadow = true;
+    buildingGroup.add(door);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12), new THREE.MeshStandardMaterial({ color: 0xccbbaa, roughness: 0.3, metalness: 0.8 }));
+    knob.position.set(2.45, 1.25, roomD/2 - 0.01); knob.castShadow = true;
+    buildingGroup.add(knob);
+
+    const winFrameMat = new THREE.MeshStandardMaterial({ color: 0xe0e5ea, roughness: 0.5 });
+    const winGlassMat = new THREE.MeshStandardMaterial({ color: 0xaac5dd, transparent: true, opacity: 0.55, roughness: 0.15, metalness: 0.0, emissive: new THREE.Color(0x1a334d), emissiveIntensity: 0.15 });
+    const winW = 2.4; const winH = 1.9;
+    const windowFrame = new THREE.Mesh(new THREE.BoxGeometry(winW, winH, wallThick + 0.02), winFrameMat);
+    windowFrame.position.set(-1.8, 1.7, roomD/2 - wallThick/2); windowFrame.castShadow = true; windowFrame.receiveShadow = true;
+    buildingGroup.add(windowFrame);
+    const windowGlass = new THREE.Mesh(new THREE.BoxGeometry(winW-0.16, winH-0.16, 0.05), winGlassMat);
+    windowGlass.position.set(-1.8, 1.7, roomD/2 - 0.01); windowGlass.castShadow = true; windowGlass.receiveShadow = true;
+    buildingGroup.add(windowGlass);
+
+    const curtainMat = new THREE.MeshStandardMaterial({ color: 0xd9cdbc, roughness: 0.85, transparent: true, opacity: 0.75, side: THREE.DoubleSide });
+    const curtainLeft = new THREE.Mesh(new THREE.BoxGeometry(0.28, winH+0.12, 0.12), curtainMat);
+    curtainLeft.position.set(-2.95, 1.7, roomD/2 - 0.22); curtainLeft.castShadow = true; curtainLeft.receiveShadow = true;
+    buildingGroup.add(curtainLeft);
+    const curtainRight = curtainLeft.clone();
+    curtainRight.position.set(-0.65, 1.7, roomD/2 - 0.22); buildingGroup.add(curtainRight);
+    const curtainTop = new THREE.Mesh(new THREE.BoxGeometry(winW+0.35, 0.15, 0.12), curtainMat);
+    curtainTop.position.set(-1.8, 2.65, roomD/2 - 0.22); curtainTop.castShadow = true;
+    buildingGroup.add(curtainTop);
+
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xb0c8e8, transparent: true, opacity: 0.16, roughness: 0.5, metalness: 0.0, emissive: new THREE.Color(0x1a2b3c), emissiveIntensity: 0.25, side: THREE.DoubleSide });
+    const skinShell = new THREE.Mesh(new THREE.BoxGeometry(roomW + 0.7, 0.25, roomD + 0.7), skinMat);
+    skinShell.position.set(0, roomH + 0.15, 0); skinShell.receiveShadow = false; skinShell.castShadow = true;
+    skinGroup.add(skinShell);
+    const skinEdges = new THREE.EdgesGeometry(skinShell.geometry);
+    const skinLine = new THREE.LineSegments(skinEdges, new THREE.LineBasicMaterial({ color: 0x6a9ac0 }));
+    skinShell.add(skinLine);
+
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0xbc8f6a, roughness: 0.8, metalness: 0.05 });
+    const mountBoard = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.09, 1.0), woodMat);
+    mountBoard.position.set(1.4, roomH - 0.28, -1.6); mountBoard.castShadow = true; mountBoard.receiveShadow = true;
+    monitorGroup.add(mountBoard);
+
+    // 四个按钮 + 连线 + CSS2D标签
+    const buttons = [];
+    const btnNames = ['电路', '温湿度', '人员', '消防'];
+    const btnPositions = [
+      { pos: [-0.45, 0.13, -0.3], name: '电路状态' },
+      { pos: [0.45, 0.13, -0.3], name: '环境温湿度' },
+      { pos: [-0.45, 0.13, 0.3], name: '人员检测' },
+      { pos: [0.45, 0.13, 0.3], name: '消防监测' }
+    ];
+
+    const labelOffsets = [
+      { x: -0.6, y: 0.25, z: -0.4 },
+      { x: 0.6, y: 0.25, z: -0.4 },
+      { x: -0.6, y: 0.25, z: 0.4 },
+      { x: 0.6, y: 0.25, z: 0.4 }
+    ];
+
+    btnPositions.forEach((p, idx) => {
+      const btnMat = new THREE.MeshStandardMaterial({
+        color: 0x00e0ff,
+        roughness: 0.35,
+        metalness: 0.15,
+        emissive: new THREE.Color(0x004466),
+        emissiveIntensity: 0.5
+      });
+      const btn = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16), btnMat);
+      const btnX = 1.4 + p.pos[0];
+      const btnY = roomH - 0.23 + p.pos[1];
+      const btnZ = -1.6 + p.pos[2];
+      btn.position.set(btnX, btnY, btnZ);
+      btn.castShadow = true;
+      monitorGroup.add(btn);
+      buttons.push(btn);
+
+      const labelX = btnX + labelOffsets[idx].x;
+      const labelY = btnY + labelOffsets[idx].y;
+      const labelZ = btnZ + labelOffsets[idx].z;
+
+      const points = [
+        new THREE.Vector3(btnX, btnY, btnZ),
+        new THREE.Vector3(labelX, labelY, labelZ)
+      ];
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+      const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00e0ff });
+      const line = new THREE.Line(lineGeometry, lineMaterial);
+      monitorGroup.add(line);
+
+      const div = document.createElement('div');
+      div.textContent = btnNames[idx];
+      div.style.color = '#00e0ff';
+      div.style.fontSize = '28px';
+      div.style.fontWeight = 'bold';
+      div.style.textShadow = '0 0 15px #00e0ff';
+      div.style.background = 'rgba(5, 22, 40, 0.8)';
+      div.style.padding = '4px 16px';
+      div.style.borderRadius = '24px';
+      div.style.border = '1px solid #00e0ff';
+      div.style.backdropFilter = 'blur(4px)';
+      div.style.pointerEvents = 'none';
+      div.style.whiteSpace = 'nowrap';
+
+      const label = new CSS2DObject(div);
+      label.position.set(labelX, labelY, labelZ);
+      monitorGroup.add(label);
+    });
+
+    window.allButtons.push({ buttons, containerId });
+
+    const cameraHead = new THREE.Group();
+    cameraHead.position.set(1.4, roomH - 0.45, -1.6);
+    monitorGroup.add(cameraHead);
+
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.5, metalness: 0.25 });
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.42, 0.11, 12), baseMat);
+    base.position.y = 0.06; base.castShadow = true; base.receiveShadow = true;
+    cameraHead.add(base);
+
+    const domeMat = new THREE.MeshStandardMaterial({ color: 0x2a2e35, roughness: 0.35, metalness: 0.1 });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 16), domeMat);
+    dome.scale.set(1.0, 0.55, 1.0); dome.position.y = 0.24; dome.castShadow = true; dome.receiveShadow = true;
+    cameraHead.add(dome);
+
+    const lensMat = new THREE.MeshStandardMaterial({ color: 0x181c24, roughness: 0.2, metalness: 0.0, emissive: new THREE.Color(0x1a334d), emissiveIntensity: 0.3 });
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.09, 10), lensMat);
+    lens.rotation.x = Math.PI / 2; lens.rotation.z = 0.2; lens.position.set(0.2, 0.2, 0.22); lens.castShadow = true;
+    cameraHead.add(lens);
+    const lensGlass = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8), new THREE.MeshStandardMaterial({ color: 0x7a9ec0, roughness: 0.08, metalness: 0.0, emissive: new THREE.Color(0x1a4a6a), emissiveIntensity: 0.25 }));
+    lensGlass.position.set(0.25, 0.2, 0.29); lensGlass.castShadow = true;
+    cameraHead.add(lensGlass);
+
+    const bedGroup = new THREE.Group();
+    bedGroup.position.set(-2.2, 0, 2.0);
+    const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.26, 2.2), new THREE.MeshStandardMaterial({ color: 0x9b7e5e, roughness: 0.7 }));
+    bedFrame.position.y = 0.13; bedFrame.castShadow = true; bedFrame.receiveShadow = true; bedGroup.add(bedFrame);
+    const mattress = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, 2.0), new THREE.MeshStandardMaterial({ color: 0xf0ebe5, roughness: 0.9 }));
+    mattress.position.y = 0.32; mattress.castShadow = true; mattress.receiveShadow = true; bedGroup.add(mattress);
+    const pillow1 = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.16, 0.45), new THREE.MeshStandardMaterial({ color: 0xd9d2c4, roughness: 0.8 }));
+    pillow1.position.set(-0.8, 0.48, -0.6); pillow1.castShadow = true; pillow1.receiveShadow = true; bedGroup.add(pillow1);
+    const pillow2 = pillow1.clone(); pillow2.position.set(0.8, 0.48, -0.6); bedGroup.add(pillow2);
+    furnitureGroup.add(bedGroup);
+
+    const tableGroup = new THREE.Group();
+    tableGroup.position.set(1.8, 0, 0.5);
+    const tableTop = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.07, 24), new THREE.MeshStandardMaterial({ color: 0xb89a7a, roughness: 0.55 }));
+    tableTop.position.y = 0.53; tableTop.castShadow = true; tableTop.receiveShadow = true; tableGroup.add(tableTop);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x6a5a4a, roughness: 0.7 });
+    const legPositions = [[0, 0.26, 0.65], [-0.56, 0.26, -0.32], [0.56, 0.26, -0.32]];
+    legPositions.forEach(pos => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.52, 6), legMat);
+      leg.position.set(pos[0], pos[1], pos[2]); leg.castShadow = true; leg.receiveShadow = true;
+      tableGroup.add(leg);
+    });
+    furnitureGroup.add(tableGroup);
+
+    const cabinet = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.0, 0.9), new THREE.MeshStandardMaterial({ color: 0xa58b6e, roughness: 0.65 }));
+    cabinet.position.set(-1.5, 1.0, -2.3); cabinet.castShadow = true; cabinet.receiveShadow = true;
+    furnitureGroup.add(cabinet);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.18), new THREE.MeshStandardMaterial({ color: 0xccd, metalness: 0.8, roughness: 0.25 }));
+    handle.rotation.z = Math.PI/2; handle.position.set(-1.15, 1.1, -1.87); handle.castShadow = true;
+    furnitureGroup.add(handle);
+
+    const rug = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.035, 1.6), new THREE.MeshStandardMaterial({ color: 0x6e8f7c, roughness: 0.9 }));
+    rug.position.set(0.5, 0.018, 1.9); rug.receiveShadow = true; rug.castShadow = false;
+    furnitureGroup.add(rug);
+
+    // 添加AI机器人助手
+    const robot = createCyberRobot();
+    scene.add(robot);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const time = performance.now() * 0.001;
+      if (cameraHead) {
+        cameraHead.rotation.y = Math.sin(time * 0.25) * 1.3;
+        cameraHead.rotation.x = Math.sin(time * 0.18) * 0.18 + 0.12;
+      }
+      controls.update();
+      renderer.render(scene, camera);
+      css2DRenderer.render(scene, camera);
+    }
+    animate();
+
+    const resizeObserver = new ResizeObserver(() => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      renderer.setSize(width, height);
+      css2DRenderer.setSize(width, height);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    });
+    resizeObserver.observe(container);
+  }
+
+  window.__updateButtons = function(states) {
+    if (!window.allButtons) return;
+    window.allButtons.forEach(item => {
+      item.buttons.forEach((btn, idx) => {
+        const isAlert = states[idx] === 'alert';
+        btn.material.color.setHex(isAlert ? 0xff0033 : 0x00e0ff);
+        btn.material.emissive.setHex(isAlert ? 0x550000 : 0x004466);
+        if (!btn.userData.breathing && isAlert) {
+          btn.userData.breathing = true;
+        } else if (!isAlert) {
+          btn.userData.breathing = false;
+          btn.scale.setScalar(1.0);
+        }
+      });
+    });
+  };
+
+  function animateButtons() {
+    requestAnimationFrame(animateButtons);
+    if (!window.allButtons) return;
+    window.allButtons.forEach(item => {
+      item.buttons.forEach((btn) => {
+        if (btn.userData.breathing) {
+          const time = performance.now() * 0.008;
+          const scale = 1.0 + 0.3 * (Math.sin(time) * 0.5 + 0.5);
+          btn.scale.setScalar(scale);
+        }
+      });
+    });
+  }
+  animateButtons();
+
+  setTimeout(() => {
+    window.allButtons = window.allButtons || [];
+    createIndoorScene('view3d-home');
+    createIndoorScene('view3d-power');
+    createIndoorScene('view3d-temp');
+  }, 100);
+</script>
+
+<script>
+  // ========== 页面切换 ==========
+  (function() {
+    const navItems = document.querySelectorAll('.nav-item');
+    const pages = {
+      home: document.getElementById('page-home'),
+      monitor: document.getElementById('page-monitor'),
+      power: document.getElementById('page-power'),
+      temp: document.getElementById('page-temp'),
+      log: document.getElementById('page-log')
+    };
+    function switchPage(pageId) {
+      navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
+      Object.values(pages).forEach(page => { if (page) page.classList.remove('active'); });
+      if (pages[pageId]) pages[pageId].classList.add('active');
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+        if (pageId !== 'log') drawChartsForPage(pageId);
+        else renderLogs();
+      }, 50);
+    }
+    navItems.forEach(item => item.addEventListener('click', () => switchPage(item.dataset.page)));
+  })();
+
+  // 图表绘制
+  function drawPie(canvasId, val, color) {
+    const canvas = document.getElementById(canvasId); if (!canvas) return;
+    const ctx = canvas.getContext('2d'); const c = canvas;
+    c.width = c.offsetWidth; c.height = c.offsetHeight;
+    const r = Math.min(c.width, c.height) * 0.4, cx = c.width / 2, cy = c.height / 2;
+    ctx.clearRect(0,0,c.width,c.height);
+    ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI/2, Math.PI*1.5); ctx.fillStyle = 'rgba(0,30,40,0.5)'; ctx.fill();
+    const end = -Math.PI/2 + val/100*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, -Math.PI/2, end); ctx.closePath();
+    ctx.fillStyle = color; ctx.fill(); ctx.shadowColor = color; ctx.shadowBlur = 15;
+  }
+  function drawLine(canvasId, data, color) {
+    const canvas = document.getElementById(canvasId); if (!canvas) return;
+    const ctx = canvas.getContext('2d'); const c = canvas;
+    c.width = c.offsetWidth; c.height = c.offsetHeight;
+    const w = c.width, h = c.height, max = Math.max(...data) * 1.2 || 10;
+    ctx.clearRect(0,0,w,h); ctx.beginPath();
+    data.forEach((v,i) => { const x = i/(data.length-1)*w, y = h - (v/max)*h*0.8 + h*0.1; i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); });
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.shadowColor = color; ctx.shadowBlur = 10; ctx.stroke();
+    data.forEach((v,i) => { const x = i/(data.length-1)*w, y = h - (v/max)*h*0.8 + h*0.1; ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fillStyle = color; ctx.fill(); });
+  }
+  function drawMonitorCharts() { drawLine('monitorChart1', [3.8,4.0,4.5,4.2,4.8,4.3], '#00e0ff'); drawLine('monitorChart2', [85,72,60,48,35,28], '#ff9d4a'); drawPie('monitorChart3', 65, '#4dffb7'); }
+  function drawChartsForPage(pageId) {
+    if (pageId === 'home') { drawPie('chart1', 50, '#00e0ff'); drawPie('chart2', 10, '#ff9d4a'); drawPie('chart6', 0, '#5effb5'); drawLine('chart3', [0,0,0,0,0,0], '#4dffb7'); drawLine('chart4', [25,25,25,25,25,25], '#66f5ff'); drawLine('chart5', [0,0,0,0,0,0], '#ffcc4d'); }
+    if (pageId === 'monitor') drawMonitorCharts();
+    if (pageId === 'power') { drawPie('powerChart1', 50, '#ffcc4d'); drawLine('powerChart2', [0,0,0,0,0,0], '#ffcc4d'); }
+    if (pageId === 'temp') { drawLine('tempChart1', [25,25,25,25,25,25], '#66f5ff'); drawLine('tempChart2', [50,50,50,50,50,50], '#66f5ff'); }
+  }
+
+  // ========== 日志系统 ==========
+  const logData = [];
+
+  let currentFilter = 'all';
+  const container = document.getElementById('logListContainer');
+
+  function renderLogs() {
+    const filtered = logData.filter(log => {
+      if (currentFilter === 'alert') return log.type === 'alert';
+      if (currentFilter === 'running') return log.type === 'running';
+      if (currentFilter === 'operation') return log.type === 'operation';
+      return true;
+    });
+    container.innerHTML = '';
+    filtered.forEach(log => {
+      const item = document.createElement('div');
+      item.className = `log-item ${log.type === 'alert' ? 'alert-log' : ''}`;
+      item.innerHTML = `
+        <div class="log-time">${log.time}</div>
+        <div class="log-icon">${log.icon}</div>
+        <div class="log-type">${log.event}</div>
+        <div class="log-detail">${log.detail}</div>
+        <div class="log-location">📍 ${log.location}</div>
+        <div class="log-level level-${log.level}">${log.level==='high'?'高':(log.level==='mid'?'中':'低')}</div>
+      `;
+      container.appendChild(item);
+    });
+    document.getElementById('alertCount').textContent = logData.filter(l => l.type === 'alert').length;
+    document.getElementById('eventTotal').textContent = logData.length;
+  }
+
+  // 过滤按钮
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentFilter = this.dataset.filter;
+      renderLogs();
+    });
+  });
+  document.querySelectorAll('.time-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      renderLogs();
+    });
+  });
+
+  // 测试弹窗
+  const modal = document.getElementById('testModal');
+  document.getElementById('testPanelBtn').addEventListener('click', () => modal.style.display = 'block');
+  document.getElementById('closeModalBtn').addEventListener('click', () => modal.style.display = 'none');
+  
+  // 👇 ！！这里包含绝对路径修改，保证能找到声音文件 ！！ 👇
+  document.querySelectorAll('.test-action').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const action = this.dataset.action;
+      if (action === 'intrude' || action === 'smoke') {
+        
+        document.body.classList.add('alarm-active');
+        playAlarmSound();
+        setTimeout(() => {
+            document.body.classList.remove('alarm-active');
+            stopAlarmSound();
+        }, 5000);
+
+        logData.unshift({ time: new Date().toLocaleTimeString('zh-CN', { hour12: false }), type: 'alert', icon: '🔴', event: action === 'intrude' ? '人员入侵' : '烟雾报警', detail: '模拟报警触发', location: action === 'intrude' ? '客厅' : '厨房', level: 'high' });
+        renderLogs();
+      } else if (action === 'clear') {
+        logData.length = 0; renderLogs();
+      } else if (action === 'export') {
+        alert('导出功能需引入 xlsx 库');
+      } else if (action === 'testAlarm') {
+        new Audio('http://127.0.0.1:8002/static/audio/alarm.mp3').play().then(() => console.log('✅ 报警音播放成功')).catch(e => alert('语音文件不存在或无法播放'));
+      }
+      modal.style.display = 'none';
+    });
+  });
+
+  // 首次渲染
+  renderLogs();
+  drawChartsForPage('home');
+
+  // 语音报警与状态更新
+  function getStatesFromTexts() {
+    const txt1 = document.getElementById('txt1')?.innerText || '';
+    const txt2 = document.getElementById('txt2')?.innerText || '';
+    const txt3 = document.getElementById('txt3')?.innerText || '';
+    const txt4 = document.getElementById('txt4')?.innerText || '';
+    const state1 = txt1.includes('正常') && !txt1.includes('偏高') ? 'normal' : 'alert';
+    const state2 = txt4.includes('48%') || txt4.includes('42%') || txt4.includes('55%') ? 'normal' : 'alert';
+    const state3 = (txt3.includes('无闯入') || txt3.includes('区域正常')) ? 'normal' : 'alert';
+    const state4 = txt2.includes('安全') ? 'normal' : 'alert';
+    return [state1, state2, state3, state4];
+  }
+
+  function updateAllButtons() {
+    const states = getStatesFromTexts();
+    if (typeof window.__updateButtons === 'function') {
+      window.__updateButtons(states);
+    }
+    if (states.includes('alert')) {
+      const audio = new Audio('http://127.0.0.1:8002/static/audio/alarm.mp3');
+      audio.volume = 0.8;
+      audio.play().catch(e => console.log('语音播放需要用户交互授权'));
+    }
+  }
+
+  window.addEventListener('load', () => {
+    if (document.getElementById('page-home')?.classList.contains('active')) {
+      drawChartsForPage('home');
+    }
+  });
+</script>
+<script>
+  const BACKEND_URL = 'http://127.0.0.1:8002';
+  const WS_URL = 'ws://127.0.0.1:8002/ws';
+
+  const monitorPlaceholder = document.querySelector('.monitor-screen-placeholder');
+  const homeTempHumEl = document.getElementById('txt4');
+  const powerLarge = document.querySelector('#page-power .value-large');
+  const voltageDiv = document.querySelector('#page-power .sidebar-left .func-card:last-child .card-content');
+  const energyLarge = document.querySelector('#page-power .sidebar-right .value-large');
+  const energyCard = document.getElementById('txt5');
+  const alarmCardText = document.getElementById('txt6');
+  const peopleCard = document.getElementById('txt3');
+
+ if (monitorPlaceholder) {
+        const img = document.createElement('img');
+        img.src = 'http://192.168.254.100:5000/video_feed';
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = 'inherit';
+        monitorPlaceholder.parentNode.replaceChild(img, monitorPlaceholder);
+    }
+
+  async function fetchTempHumi() {
+    try {
+      const res = await fetch(`${BACKEND_URL}/get_temp_humi`);
+      const data = await res.json();
+      if (data.code === 200) {
+        const temp = data.temp;
+        const humi = data.humi;
+        const tempPageValue = document.querySelector('#page-temp .value-large');
+        if (tempPageValue) tempPageValue.innerText = `${temp}°C`;
+        const humiPageValue = document.querySelectorAll('#page-temp .value-large')[1];
+        if (humiPageValue) humiPageValue.innerText = `${humi}%`;
+        if (homeTempHumEl) homeTempHumEl.innerText = `${temp}℃ | 湿度 ${humi}%RH`;
+        const tempProgress = document.querySelector('#page-temp .progress-fill');
+        if (tempProgress) tempProgress.style.width = Math.min(100, Math.max(0, (temp - 10) / 30 * 100)) + '%';
+        const humiProgress = document.querySelectorAll('#page-temp .progress-fill')[1];
+        if (humiProgress) humiProgress.style.width = Math.min(100, Math.max(0, humi)) + '%';
+      }
+    } catch (err) {
+      console.warn('温湿度获取失败', err);
+    }
+  }
+
+  async function fetchEnergy() {
+    try {
+      const res = await fetch(`${BACKEND_URL}/energy/data`);
+      const data = await res.json();
+      if (data.code === 200) {
+        const { voltage, current, power, energy } = data.data;
+        if (powerLarge) powerLarge.innerText = `${power.toFixed(1)} kW`;
+        if (voltageDiv) {
+          voltageDiv.innerHTML = `<div>电压: ${voltage.toFixed(1)}V</div>
+                                 <div>电流: ${current.toFixed(1)}A</div>
+                                 <div>功率因数: 0.95</div>`;
+        }
+        if (energyLarge) energyLarge.innerText = `${energy.toFixed(1)} kWh`;
+        if (energyCard) energyCard.innerText = `今日：${energy.toFixed(2)}kWh | 能耗正常`;
+        const powerProgress = document.querySelector('#page-power .progress-fill');
+        if (powerProgress) powerProgress.style.width = Math.min(100, power / 10 * 100) + '%';
+      }
+    } catch (err) {
+      console.warn('电表数据获取失败', err);
+    }
+  }
+
+  let ws = null;
+  let reconnectTimer = null;
+  let alarmAudio = null;
+  
+  // 核心：添加硬件报警互斥锁和人群防抖控制
+  window.hwAlarmActive = false;
+  window.lastCrowdAlarm = 0;
+
+  function connectWebSocket() {
+    if (ws && ws.readyState === WebSocket.OPEN) return;
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => console.log('WebSocket 连接成功');
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'ALARM') {
+          
+          // ==============================
+          // 🚀 核心修改：白名单精准拦截
+          // ==============================
+          const aiType = (msg.data.type || '').toLowerCase();
+          const aiMsg = (msg.data.message || '').toLowerCase();
+          
+          const isDanger = 
+              aiType.includes('bottle') || aiMsg.includes('瓶') ||
+              aiType.includes('fire')   || aiMsg.includes('火') || aiMsg.includes('烟') ||
+              aiType.includes('fall')   || aiMsg.includes('倒');
+
+          if (!isDanger) {
+              return; // 无情屏蔽！只要不是这几个关键词，不发声，不闪红，连日志都不弹！
+          }
+
+          // 允许放行的危险报警
+          playAlarmSound();
+          document.body.classList.add('alarm-active');
+          setTimeout(() => {
+              if (!window.hwAlarmActive) document.body.classList.remove('alarm-active');
+          }, 3000);
+          
+          let eventName = '未知报警';
+          if (aiType.includes('bottle') || aiMsg.includes('瓶')) eventName = '🔥 危险物(瓶子)报警';
+          else if (aiType.includes('fire') || aiMsg.includes('火') || aiMsg.includes('烟')) eventName = '🔥 烟火报警';
+          else if (aiType.includes('fall') || aiMsg.includes('倒')) eventName = '⚠️ 人员跌倒报警';
+          else if (aiType.includes('circuit')) eventName = '⚡ 电路异常';
+
+          const newLog = {
+            time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+            type: 'alert',
+            icon: '🔴',
+            event: eventName,
+            detail: msg.data.message || '后端推送报警',
+            location: msg.data.room || '未知区域',
+            level: 'high'
+          };
+          logData.unshift(newLog);
+          renderLogs();
+          if (alarmCardText) alarmCardText.innerText = `报警：${logData.filter(l => l.type === 'alert').length}次 | 系统异常`;
+        
+        } else if (msg.type === 'STATS') {
+          const peopleCount = msg.data.people_count;
+          if (peopleCard) peopleCard.innerText = `人数：${peopleCount}人 | ${peopleCount > 0 ? '检测到人' : '无人'}`;
+          
+          // ==============================
+          // 🚀 核心保留：人数 > 3 人聚集报警
+          // ==============================
+          if (peopleCount > 3) {
+              playAlarmSound();
+              document.body.classList.add('alarm-active');
+              setTimeout(() => {
+                  if (!window.hwAlarmActive) document.body.classList.remove('alarm-active');
+              }, 3000);
+
+              // 5秒防抖，避免日志被每帧的人数更新疯狂刷屏
+              if (!window.lastCrowdAlarm || Date.now() - window.lastCrowdAlarm > 5000) {
+                  window.lastCrowdAlarm = Date.now();
+                  logData.unshift({
+                      time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+                      type: 'alert', icon: '🔴', event: '👥 人群聚集报警',
+                      detail: `检测到监控区域人数超过3人 (当前: ${peopleCount}人)`, location: '监控区域', level: 'high'
+                  });
+                  renderLogs();
+                  if (alarmCardText) alarmCardText.innerText = `报警：${logData.filter(l => l.type === 'alert').length}次 | 系统异常`;
+              }
+          }
+
+        } else if (msg.type === 'DATA_UPDATE') {
+          const d = msg.data;
+          
+          const pmEl = document.getElementById('air-pm25');
+          if (pmEl) pmEl.innerText = `PM2.5: ${d.mq135} µg/m³`;
+
+          const co2El = document.getElementById('air-co2');
+          if (co2El) co2El.innerText = `CO₂: ${d.mq7} ppm`;
+
+          const tvocEl = document.getElementById('air-tvoc');
+          if (tvocEl) tvocEl.innerText = `TVOC: ${d.mq2} mg/m³`;
+
+          // ==============================
+          // 🚀 核心保留：温湿度燃气传感器阈值报警 (修复了闪烁互顶Bug)
+          // ==============================
+          if (d.mq2 > 1500 || d.mq7 > 1500 || d.mq135 > 1500 || d.temp > 35) {
+              window.hwAlarmActive = true;
+              if (!document.body.classList.contains('alarm-active')) {
+                  document.body.classList.add('alarm-active');
+                  playAlarmSound();
+                  logData.unshift({
+                      time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+                      type: 'alert', icon: '⚠️', event: '环境异常',
+                      detail: `传感器数值超标(燃气:${d.mq2}/温度:${d.temp})`, location: '监控区域', level: 'high'
+                  });
+                  renderLogs();
+              }
+          } else {
+              if (window.hwAlarmActive) {
+                  window.hwAlarmActive = false;
+                  document.body.classList.remove('alarm-active');
+                  stopAlarmSound();
+              }
+          }
+        }
+      } catch (e) {
+        console.error('WebSocket 消息解析失败', e);
+      }
+    };
+    ws.onclose = () => {
+      console.log('WebSocket 断开，5秒后重连');
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connectWebSocket, 5000);
+    };
+  }
+
+  // 👇 ！！保证声音 100% 播放 ！！ 👇 
+  function playAlarmSound() {
+    if (!alarmAudio) {
+      alarmAudio = new Audio('http://127.0.0.1:8002/static/audio/alarm.mp3');
+      alarmAudio.loop = true;
+    }
+    alarmAudio.play().catch(e => console.warn('播放报警音失败，请先点击网页任意位置授权播放', e));
+  }
+
+  function stopAlarmSound() {
+    if (alarmAudio) {
+      alarmAudio.pause();
+      alarmAudio.currentTime = 0;
+    }
+  }
+
+  function setupTestAlarm() {
+    const testAlarmBtn = document.querySelector('.test-action[data-action="testAlarm"]');
+    if (testAlarmBtn) {
+      testAlarmBtn.addEventListener('click', async () => {
+        playAlarmSound();
+        try { await fetch(`${BACKEND_URL}/test`); } catch (e) {}
+        setTimeout(stopAlarmSound, 3000);
+      });
+    }
+  }
+
+  setInterval(fetchTempHumi, 5000);
+  setInterval(fetchEnergy, 5000);
+
+  window.addEventListener('load', () => {
+    connectWebSocket();
+    setupTestAlarm();
+    fetchTempHumi();
+    fetchEnergy();
+    if (typeof renderLogs === 'function') window.renderLogs = renderLogs;
+  });
+</script>
+
+<script>
+  (function() {
+    const overlay = document.getElementById('intro-overlay');
+    const progressFill = document.getElementById('intro-progress-fill');
+    const progressText = document.getElementById('intro-progress-text');
+
+    let progress = 0;
+    const speed = 0.015;
+    let animationFrame = null;
+    let holdTimer = null;
+
+    function updateProgress() {
+      progress = Math.min(progress + speed, 1);
+      const percent = Math.round(progress * 100);
+      progressFill.style.width = percent + '%';
+      progressText.textContent = percent + '%';
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(updateProgress);
+      } else {
+        holdTimer = setTimeout(() => {
+          overlay.style.opacity = '0';
+          setTimeout(() => {
+            overlay.style.display = 'none';
+          }, 800);
+        }, 1000);
+      }
+    }
+
+    function startAnimation() {
+      progress = 0;
+      progressFill.style.width = '0%';
+      progressText.textContent = '0%';
+      overlay.style.opacity = '1';
+      overlay.style.display = 'flex';
+
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (holdTimer) clearTimeout(holdTimer);
+
+      animationFrame = requestAnimationFrame(updateProgress);
+    }
+
+    overlay.addEventListener('click', () => {
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (holdTimer) clearTimeout(holdTimer);
+      overlay.style.opacity = '0';
+      setTimeout(() => {
+        overlay.style.display = 'none';
+      }, 400);
+    });
+
+    window.addEventListener('load', startAnimation);
+  })();
+</script>
+</body>
+</html>

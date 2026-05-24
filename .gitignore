@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# AI models (too large for git)
+*.pt
+*.pth
+
+# Config
+.env
+*.env.local
+
+# Build artifacts
+*.o
+*.d
+*.crf
+*.htm
+*.map
+*.dep
+*.hex
+*.build_log.htm
